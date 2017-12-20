@@ -34,7 +34,7 @@ that we have created in the `__init__` function.
 class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
-
+        rospy.loginfo('dbw_node start!')
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
         brake_deadband = rospy.get_param('~brake_deadband', .1)
@@ -54,7 +54,7 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        # self.controller = TwistController(<Arguments you wish to provide>)
+        self.controller = Controller()
 
         # TODO: Subscribe to all the topics you need to
 
@@ -72,6 +72,24 @@ class DBWNode(object):
             #                                                     <any other argument you need>)
             # if <dbw is enabled>:
             #   self.publish(throttle, brake, steer)
+            throttle, brake, steering = self.controller.control(0)
+            t_cmd = ThrottleCmd()
+            t_cmd.enable = True
+            t_cmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
+            t_cmd.pedal_cmd = throttle
+            self.throttle_pub.publish(t_cmd)
+
+            b_cmd = BrakeCmd()
+            b_cmd.enable = True
+            b_cmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
+            b_cmd.pedal_cmd = brake
+            self.brake_pub.publish(b_cmd)
+
+            s_cmd = SteeringCmd()
+            s_cmd.enable = True
+            s_cmd.steering_wheel_angle_cmd = steering
+            self.steer_pub.publish(s_cmd)
+
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
