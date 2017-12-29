@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from std_msgs.msg import Int32
 import tf
 
 import math
@@ -28,7 +29,6 @@ LOOKAHEAD_WPS = 200  # Number of waypoints we will publish. You can change this 
 class WaypointUpdater(object):
     def __init__(self):
 
-        rospy.loginfo("updater start!")
         rospy.init_node('waypoint_updater')
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
@@ -36,28 +36,35 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
+        rospy.Subscriber('/traffic_waypoint',Int32, self.traffic_cb)
+
+
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
+
         # TODO: Add other member variables you need below
-        #self.current_pos = None
-        #self.base_waypoints = None
+        # self.current_pos = None
+        # self.base_waypoints = None
+        self.traffic_waypoint=-1
 
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             self.loop()
             rate.sleep()
 
-        #rospy.spin()
+        # rospy.spin()
 
     def pose_cb(self, msg):
-        self.current_pos = msg
+        self.current_pose = msg
+        #rospy.loginfo("reading in position seq: %d", self.current_pose.header.seq)
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
+        #rospy.loginfo("reading in base_waypoints seq: %d", self.base_waypoints.header.seq)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.traffic_waypoint=msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -93,12 +100,15 @@ class WaypointUpdater(object):
             wpts = self.base_waypoints.waypoints
 
             next_wp = self.get_next_waypoint(pose, wpts)
-            traffic_wp = self.traffic_waypoint
 
-            self.braking = False
-            lane.waypoints = self.get_final_waypoints(wpts, next_wp, next_wp + LOOKAHEAD_WPS)
-            rospy.loginfo('road index:%d, %d',
-                          next_wp, next_wp+LOOKAHEAD_WPS)
+            if self.traffic_waypoint==-1:
+                lane.waypoints = self.get_final_waypoints(wpts, next_wp, next_wp + LOOKAHEAD_WPS)
+                rospy.loginfo('road index:%d, %d',
+                          next_wp, next_wp + LOOKAHEAD_WPS)
+            else:
+                lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint)
+                rospy.loginfo('road index:%d, %d',
+                              next_wp, self.traffic_waypoint)
 
             self.final_waypoints_pub.publish(lane)
 
