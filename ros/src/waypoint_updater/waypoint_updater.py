@@ -73,8 +73,8 @@ class WaypointUpdater(object):
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
 
-    def set_waypoint_velocity(self, waypoints, waypoint, velocity):
-        waypoints[waypoint].twist.twist.linear.x = velocity
+    def set_waypoint_velocity(self, waypoints, waypoint_index, velocity):
+        waypoints[waypoint_index].twist.twist.linear.x = velocity
 
     def wp_distance(self, waypoints, wp1, wp2):
         dist = 0
@@ -107,8 +107,15 @@ class WaypointUpdater(object):
                           next_wp, next_wp + LOOKAHEAD_WPS)
             else:
                 lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint)
+
+                lane_length=len(lane.waypoints)
+                for l in range(max((0,lane_length-30)), lane_length):
+                    self.set_waypoint_velocity(lane.waypoints, l, 0)
+
+                #rospy.loginfo('length to end point: %f', self.wp_distance(lane.waypoints,0,5))
                 rospy.loginfo('road index:%d, %d',
                               next_wp, self.traffic_waypoint)
+            #rospy.loginfo('first speed: %f', self.get_waypoint_velocity(lane.waypoints[0]))
 
             self.final_waypoints_pub.publish(lane)
 
@@ -149,10 +156,23 @@ class WaypointUpdater(object):
             wp.pose.pose.position.y = waypoints[index].pose.pose.position.y
             wp.pose.pose.position.z = waypoints[index].pose.pose.position.z
             wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
-            wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
+            #wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
+            wp.twist.twist.linear.x = self.get_sine_speed(index)
             final_waypoints.append(wp)
 
         return final_waypoints
+
+    def get_sine_speed(self,index):
+
+        T=3*79*2
+        v_0=12.0
+
+        v=v_0+v_0/2.0*math.sin(2.0*3.1416*float(index)/float(T))
+
+        return v
+
+
+
 
 
 if __name__ == '__main__':

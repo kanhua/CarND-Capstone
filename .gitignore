@@ -6,3 +6,5 @@ devel
 profile.tmp
 
 .idea/
+
+data/dbw_test.rosbag.bag
