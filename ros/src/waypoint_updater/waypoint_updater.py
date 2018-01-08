@@ -36,16 +36,14 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
-        rospy.Subscriber('/traffic_waypoint',Int32, self.traffic_cb)
-
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
-
 
         # TODO: Add other member variables you need below
         # self.current_pos = None
         # self.base_waypoints = None
-        self.traffic_waypoint=-1
+        self.traffic_waypoint = -1
 
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
@@ -56,15 +54,15 @@ class WaypointUpdater(object):
 
     def pose_cb(self, msg):
         self.current_pose = msg
-        #rospy.loginfo("reading in position seq: %d", self.current_pose.header.seq)
+        # rospy.loginfo("reading in position seq: %d", self.current_pose.header.seq)
 
     def waypoints_cb(self, waypoints):
         self.base_waypoints = waypoints
-        #rospy.loginfo("reading in base_waypoints seq: %d", self.base_waypoints.header.seq)
+        # rospy.loginfo("reading in base_waypoints seq: %d", self.base_waypoints.header.seq)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        self.traffic_waypoint=msg.data
+        self.traffic_waypoint = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -101,23 +99,73 @@ class WaypointUpdater(object):
 
             next_wp = self.get_next_waypoint(pose, wpts)
 
-            if self.traffic_waypoint==-1:
+            if self.traffic_waypoint == -1:
                 lane.waypoints = self.get_final_waypoints(wpts, next_wp, next_wp + LOOKAHEAD_WPS)
-                rospy.loginfo('road index:%d, %d',
-                          next_wp, next_wp + LOOKAHEAD_WPS)
+                # rospy.loginfo('road index:%d, %d',
+                #              next_wp, next_wp + LOOKAHEAD_WPS)
             else:
-                lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint)
 
-                lane_length=len(lane.waypoints)
-                for l in range(max((0,lane_length-60)), lane_length):
-                    self.set_waypoint_velocity(lane.waypoints, l, 0)
+                if (self.traffic_waypoint-next_wp > LOOKAHEAD_WPS):
+                    lane.waypoints = self.get_final_waypoints(wpts, next_wp, next_wp + LOOKAHEAD_WPS)
+                else:
 
-                #rospy.loginfo('length to end point: %f', self.wp_distance(lane.waypoints,0,5))
+                    buffer=30
+                    lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint-buffer)
+
+                    self.grad_reduce_to_zero(lane)
+
+                    zero_vel_wpts=self.get_final_waypoints(wpts, self.traffic_waypoint-buffer,
+                                             self.traffic_waypoint + LOOKAHEAD_WPS, mode='zero')
+
+                    lane.waypoints.extend(zero_vel_wpts)
+
+                    #if len(lane.waypoints) > 2:
+                    #    rospy.loginfo("-2 velocity: %f", self.get_waypoint_velocity(lane.waypoints[-2]))
+
+
+                # rospy.loginfo('length to end point: %f', self.wp_distance(lane.waypoints,0,5))
                 rospy.loginfo('road index:%d, %d',
                               next_wp, self.traffic_waypoint)
-            #rospy.loginfo('first speed: %f', self.get_waypoint_velocity(lane.waypoints[0]))
+            # rospy.loginfo('first speed: %f', self.get_waypoint_velocity(lane.waypoints[0]))
 
             self.final_waypoints_pub.publish(lane)
+
+    def reduce_to_zero(self, lane):
+        """
+        This sets the final N points before the traffic_waypoint to zero.
+
+        :param lane:
+        :return:
+        """
+        lane_length = len(lane.waypoints)
+        for l in range(max((0, lane_length - 60)), lane_length):
+            self.set_waypoint_velocity(lane.waypoints, l, 0)
+
+    def grad_reduce_to_zero(self, lane):
+
+        a_max = 4  # the maximum is 10 m/s^2
+        lane_length = len(lane.waypoints)
+        v_0 = 0
+        v_max = 12
+
+        rospy.loginfo("number of waypoints: %d", lane_length)
+
+        if lane_length > 0:
+            self.set_waypoint_velocity(lane.waypoints, lane_length - 1, 0)
+
+            # launch this calculation only when the car
+            # approaches the traffic light
+            if lane_length < 30:
+                for l in range(lane_length - 2, 0, -1):
+                    d = self.wp_distance(lane.waypoints, l, l + 1)
+
+                    v_p = math.sqrt(v_0 * v_0 + 2 * a_max * d)
+                    #rospy.loginfo("calculated vp: %f", v_p)
+                    if v_p < v_max:
+                        self.set_waypoint_velocity(lane.waypoints, l, v_p)
+                        v_0 = v_p
+                    else:
+                        break
 
     def get_closest_waypoint(self, pose, waypoints):
         closest_dist = float('inf')
@@ -147,7 +195,7 @@ class WaypointUpdater(object):
 
         return closest_wp
 
-    def get_final_waypoints(self, waypoints, start_wp, end_wp):
+    def get_final_waypoints(self, waypoints, start_wp, end_wp, mode='const'):
         final_waypoints = []
         for i in range(start_wp, end_wp):
             index = i % len(waypoints)
@@ -156,23 +204,23 @@ class WaypointUpdater(object):
             wp.pose.pose.position.y = waypoints[index].pose.pose.position.y
             wp.pose.pose.position.z = waypoints[index].pose.pose.position.z
             wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
-            wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
-            #wp.twist.twist.linear.x = self.get_sine_speed(index)
+            if mode == 'const':
+                wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
+            elif mode == 'sine':
+                wp.twist.twist.linear.x = self.get_sine_speed(index)
+            elif mode == 'zero':
+                wp.twist.twist.linear.x = 0
             final_waypoints.append(wp)
 
         return final_waypoints
 
-    def get_sine_speed(self,index):
+    def get_sine_speed(self, index):
 
-        T=3*79*2
-        v_0=12.0
-
-        v=v_0+v_0/2.0*math.sin(2.0*3.1416*float(index)/float(T))
+        T = 3 * 79 * 2
+        v_0 = 12.0
+        v = v_0 + v_0 / 1.2 * math.sin(2.0 * 3.1416 * float(index) / float(T))
 
         return v
-
-
-
 
 
 if __name__ == '__main__':

@@ -37,7 +37,7 @@ class Controller(object):
 
         if pid_val < 0:
             throttle = 0
-            brake = self.torque
+            brake = self.torque*10
         else:
             throttle = np.tanh(pid_val)
             brake = 0
