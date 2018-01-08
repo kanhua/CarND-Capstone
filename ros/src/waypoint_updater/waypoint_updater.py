@@ -109,7 +109,7 @@ class WaypointUpdater(object):
                 lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint)
 
                 lane_length=len(lane.waypoints)
-                for l in range(max((0,lane_length-30)), lane_length):
+                for l in range(max((0,lane_length-60)), lane_length):
                     self.set_waypoint_velocity(lane.waypoints, l, 0)
 
                 #rospy.loginfo('length to end point: %f', self.wp_distance(lane.waypoints,0,5))
@@ -156,8 +156,8 @@ class WaypointUpdater(object):
             wp.pose.pose.position.y = waypoints[index].pose.pose.position.y
             wp.pose.pose.position.z = waypoints[index].pose.pose.position.z
             wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
-            #wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
-            wp.twist.twist.linear.x = self.get_sine_speed(index)
+            wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
+            #wp.twist.twist.linear.x = self.get_sine_speed(index)
             final_waypoints.append(wp)
 
         return final_waypoints

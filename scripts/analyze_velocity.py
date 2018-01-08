@@ -9,6 +9,7 @@ infile = "../velocity.log"
 
 vel = np.loadtxt(infile, delimiter=',', usecols=(1, 2))
 
-plt.plot(vel[:, 0])
-plt.plot(vel[:, 1])
+plt.plot(vel[:, 0],label="current veloctiy")
+plt.plot(vel[:, 1],label="cmd velocity")
+plt.legend()
 plt.show()
