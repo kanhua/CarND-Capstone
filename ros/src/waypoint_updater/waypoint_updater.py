@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped,TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 import tf
@@ -33,6 +33,7 @@ class WaypointUpdater(object):
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
@@ -68,6 +69,9 @@ class WaypointUpdater(object):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
 
+    def current_velocity_cb(self, msg):
+        self.current_velocity = msg
+
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
 
@@ -78,6 +82,7 @@ class WaypointUpdater(object):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
         for i in range(wp1, wp2 + 1):
+            i=i%len(waypoints)
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
@@ -105,7 +110,7 @@ class WaypointUpdater(object):
                 #              next_wp, next_wp + LOOKAHEAD_WPS)
             else:
 
-                if (self.traffic_waypoint-next_wp > LOOKAHEAD_WPS):
+                if (self.get_index_diff(wpts,next_wp,self.traffic_waypoint) > LOOKAHEAD_WPS):
                     lane.waypoints = self.get_final_waypoints(wpts, next_wp, next_wp + LOOKAHEAD_WPS)
                 else:
 
@@ -130,6 +135,21 @@ class WaypointUpdater(object):
 
             self.final_waypoints_pub.publish(lane)
 
+    def get_index_diff(self,waypoints,wp_index_1,wp_index_2):
+        """
+        Calculate the index difference wp_index_2-wp_index1, with the consideration of modulus
+
+        :param waypoints:
+        :param wp_index_1:
+        :param wp_index_2:
+        :return:
+        """
+
+        if (wp_index_2<wp_index_1):
+            return wp_index_2+len(waypoints)-wp_index_1
+        else:
+            return wp_index_2-wp_index_1
+
     def reduce_to_zero(self, lane):
         """
         This sets the final N points before the traffic_waypoint to zero.
@@ -153,6 +173,8 @@ class WaypointUpdater(object):
         if lane_length > 0:
             self.set_waypoint_velocity(lane.waypoints, lane_length - 1, 0)
 
+            current_linear_v = self.current_velocity.twist.linear.x
+
             # launch this calculation only when the car
             # approaches the traffic light
             if lane_length < 30:
@@ -161,11 +183,17 @@ class WaypointUpdater(object):
 
                     v_p = math.sqrt(v_0 * v_0 + 2 * a_max * d)
                     #rospy.loginfo("calculated vp: %f", v_p)
-                    if v_p < v_max:
-                        self.set_waypoint_velocity(lane.waypoints, l, v_p)
-                        v_0 = v_p
+
+                    if current_linear_v > 8:
+                        if v_p < v_max:
+                            self.set_waypoint_velocity(lane.waypoints, l, v_p)
+                            v_0 = v_p
+                        else:
+                            break
                     else:
-                        break
+                        # this block deals with the sudden change of the traffic light
+                        # set everything to zero
+                        self.set_waypoint_velocity(lane.waypoints,l,0)
 
     def get_closest_waypoint(self, pose, waypoints):
         closest_dist = float('inf')

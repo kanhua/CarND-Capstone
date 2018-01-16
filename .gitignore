@@ -8,3 +8,5 @@ profile.tmp
 .idea/
 
 data/dbw_test.rosbag.bag
+
+ros/src/tl_detector/ssd_mobilenet_v1_coco_11_06_2017/*
