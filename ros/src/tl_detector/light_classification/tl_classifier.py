@@ -1,12 +1,13 @@
-from detect_traffic_light import detect_object_single,load_graph,classify_color,select_boxes
+from detect_traffic_light import detect_object_single, load_graph, classify_color, select_boxes
 import tensorflow as tf
 import numpy as np
 
+
 class TLClassifier(object):
     def __init__(self):
-        #TODO load classifier
+        # TODO load classifier
 
-        self.detection_graph=load_graph()
+        self.detection_graph = load_graph()
         self.extract_graph_components()
 
     def extract_graph_components(self):
@@ -20,10 +21,7 @@ class TLClassifier(object):
         self.detection_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
         self.num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
 
-
-    def detect_object(self,image_np):
-
-
+    def detect_object(self, image_np):
         with tf.Session(graph=self.detection_graph) as sess:
             # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
             image_np_expanded = np.expand_dims(image_np, axis=0)
@@ -47,8 +45,6 @@ class TLClassifier(object):
 
         return cropped_image
 
-
-
     def get_classification(self, image):
         """Determines the color of the traffic light in the image
 
@@ -59,11 +55,11 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        #TODO implement light color prediction
+        # TODO implement light color prediction
 
-        #cropped_image=detect_object_single(self.detection_graph,image)
-        #cropped_image=self.detect_object(image)
-        cropped_image=image
-        classifed_index=classify_color(cropped_image)
+        # cropped_image=detect_object_single(self.detection_graph,image)
+        # cropped_image=self.detect_object(image)
+        cropped_image = image
+        classifed_index, _ = classify_color(cropped_image)
 
         return classifed_index

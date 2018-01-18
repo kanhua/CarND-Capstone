@@ -1,13 +1,7 @@
+from __future__ import division
 import numpy as np
 import os
-import six.moves.urllib as urllib
-import sys
-import tarfile
 import tensorflow as tf
-import zipfile
-
-from collections import defaultdict
-from io import StringIO
 from matplotlib import pyplot as plt
 from PIL import Image
 import cv2
@@ -16,8 +10,8 @@ if tf.__version__ != '1.3.0':
     raise ImportError('Please use tensorflow version 1.3.0')
 
 # What model to download.
-#MODEL_NAME = 'ssd_mobilenet_v1_coco_2017_11_17'
-MODEL_NAME='ssd_mobilenet_v1_coco_11_06_2017'
+# MODEL_NAME = 'ssd_mobilenet_v1_coco_2017_11_17'
+MODEL_NAME = 'ssd_mobilenet_v1_coco_11_06_2017'
 MODEL_FILE = MODEL_NAME + '.tar.gz'
 DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
 
@@ -139,22 +133,22 @@ def get_h_image(rgb_image):
 
 def high_value_region_mask(rgb_image, v_thres=0.6):
     hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
-    idx = (hsv_image[:, :, 2] / 255) < v_thres
+    idx = (hsv_image[:, :, 2].astype(np.float) / 255.0) < v_thres
     mask = np.ones_like(hsv_image[:, :, 2])
     mask[idx] = 0
     return mask
 
 
-def get_high_saturation_region(rgb_image, s_thres=0.6):
+def high_saturation_region_mask(rgb_image, s_thres=0.6):
     hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
-    idx = (hsv_image[:, :, 1] / 255) < s_thres
+    idx = (hsv_image[:, :, 1].astype(np.float) / 255.0) < s_thres
     mask = np.ones_like(hsv_image[:, :, 1])
     mask[idx] = 0
     return mask
 
 
 def get_masked_hue_values(rgb_image):
-    sat_mask = get_high_saturation_region(rgb_image)
+    sat_mask = high_saturation_region_mask(rgb_image)
     val_mask = high_value_region_mask(rgb_image)
     hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
     masked_hue_image = hsv_image[:, :, 0]
@@ -175,19 +169,19 @@ def get_masked_hue_values(rgb_image):
 
 def classify_color(rgb_image):
     hue_value = get_masked_hue_values(rgb_image)
-    color_text = ['red', 'yellow', 'green']
+    # use additional '_' so that the indexes can match
+    color_text = ['red', 'yello', 'green', '_', 'unknown']
     color_hue = np.array([0, 0.333 * np.pi, 0.66 * np.pi])
 
-    value_diff=np.abs(color_hue - hue_value)
+    value_diff = np.abs(color_hue - hue_value)
     min_index = np.argmin(value_diff)
-    if (value_diff[min_index] > 0.33*np.pi):
-        min_index=4
+    if (value_diff[min_index] > 0.33 * np.pi):
+        min_index = 4
 
-    return min_index,color_text[min_index]
+    return min_index, color_text[min_index]
 
 
 if __name__ == "__main__":
-
     det_graph = load_graph()
 
     PATH_TO_TEST_IMAGES_DIR = '/Users/kanhua/Dropbox/Programming/udacity-carnd/CarND-Capstone/data/images/'

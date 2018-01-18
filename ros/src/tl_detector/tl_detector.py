@@ -15,6 +15,7 @@ import string
 import random
 
 STATE_COUNT_THRESHOLD = 3
+print("opencv version:",cv2.__version__)
 
 
 def record_image(cv_image,ref_state,save_path):
@@ -218,13 +219,16 @@ class TLDetector(object):
 
         # Get classification
         # TODO change here use signal or classification
-        cv_image=cv2.cvtColor(cv_image,cv2.COLOR_RGB2BGR)
-        detected_state, _ = self.light_classifier.get_classification(cv_image)
-        if detected_state!=ref_state:
-            record_image(cv_image,ref_state,save_path)
-            rospy.loginfo("det: %d, ref: %d", detected_state, ref_state)
+        if random.random()<0.1:
+            cv_image=cv2.cvtColor(cv_image,cv2.COLOR_RGB2BGR)
+            detected_state = self.light_classifier.get_classification(cv_image)
+            self.last_state=detected_state
+            if detected_state!=ref_state:
+                cv_image=cv2.cvtColor(cv_image,cv2.COLOR_RGB2BGR)
+                record_image(cv_image,ref_state,save_path)
+                rospy.loginfo("det: %d, ref: %d", detected_state, ref_state)
         # return self.light_classifier.get_classification(cv_image)
-        return detected_state
+        return self.last_state
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
