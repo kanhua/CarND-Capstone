@@ -62,8 +62,12 @@ class DBWNode(object):
                                      wheel_radius=wheel_radius)
 
         # TODO: Subscribe to all the topics you need to
+
+        self.dbw_enabled = False
+
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
 
         self.loop()
 
@@ -72,6 +76,10 @@ class DBWNode(object):
 
     def current_velocity_cb(self, msg):
         self.current_velocity = msg
+
+    def dbw_enabled_cb(self, msg):
+        self.dbw_enabled = msg.data
+        assert (self.dbw_enabled == True or self.dbw_enabled == False)
 
     def loop(self):
         rate = rospy.Rate(50)  # 50Hz
@@ -90,7 +98,7 @@ class DBWNode(object):
                 current_linear_v = self.current_velocity.twist.linear.x
                 cmd_linear_v = self.twist_cmd.twist.linear.x
 
-                rospy.loginfo("[ctv], %f, %f",current_linear_v,cmd_linear_v)
+                rospy.loginfo("[ctv], %f, %f", current_linear_v, cmd_linear_v)
 
                 current_angular_v = self.current_velocity.twist.angular.z
                 cmd_angular_v = self.twist_cmd.twist.angular.z
@@ -98,22 +106,9 @@ class DBWNode(object):
                 throttle, brake, steering = self.controller.control(cmd_linear_v,
                                                                     cmd_angular_v, current_linear_v)
                 rospy.loginfo("steering: %f", steering)
-                t_cmd = ThrottleCmd()
-                t_cmd.enable = True
-                t_cmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
-                t_cmd.pedal_cmd = throttle
-                self.throttle_pub.publish(t_cmd)
 
-                b_cmd = BrakeCmd()
-                b_cmd.enable = True
-                b_cmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
-                b_cmd.pedal_cmd = brake
-                self.brake_pub.publish(b_cmd)
-
-                s_cmd = SteeringCmd()
-                s_cmd.enable = True
-                s_cmd.steering_wheel_angle_cmd = steering
-                self.steer_pub.publish(s_cmd)
+                if self.dbw_enabled:
+                    self.publish(throttle, brake, steering)
 
             rate.sleep()
 
