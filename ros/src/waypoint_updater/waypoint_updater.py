@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped,TwistStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 import tf
@@ -24,6 +24,14 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200  # Number of waypoints we will publish. You can change this number
+
+
+def get_position(wp):
+    x = wp.pose.pose.position.x
+    y = wp.pose.pose.position.y
+    z = wp.pose.pose.position.z
+
+    return x, y, z
 
 
 class WaypointUpdater(object):
@@ -82,7 +90,7 @@ class WaypointUpdater(object):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
         for i in range(wp1, wp2 + 1):
-            i=i%len(waypoints)
+            i = i % len(waypoints)
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
@@ -110,23 +118,22 @@ class WaypointUpdater(object):
                 #              next_wp, next_wp + LOOKAHEAD_WPS)
             else:
 
-                if (self.get_index_diff(wpts,next_wp,self.traffic_waypoint) > LOOKAHEAD_WPS):
+                if (self.get_index_diff(wpts, next_wp, self.traffic_waypoint) > LOOKAHEAD_WPS):
                     lane.waypoints = self.get_final_waypoints(wpts, next_wp, next_wp + LOOKAHEAD_WPS)
                 else:
 
-                    buffer=30
-                    lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint-buffer)
+                    buffer = 30
+                    lane.waypoints = self.get_final_waypoints(wpts, next_wp, self.traffic_waypoint - buffer)
 
                     self.grad_reduce_to_zero(lane)
 
-                    zero_vel_wpts=self.get_final_waypoints(wpts, self.traffic_waypoint-buffer,
-                                             self.traffic_waypoint + LOOKAHEAD_WPS, mode='zero')
+                    zero_vel_wpts = self.get_final_waypoints(wpts, self.traffic_waypoint - buffer,
+                                                             self.traffic_waypoint + LOOKAHEAD_WPS, mode='zero')
 
                     lane.waypoints.extend(zero_vel_wpts)
 
-                    #if len(lane.waypoints) > 2:
+                    # if len(lane.waypoints) > 2:
                     #    rospy.loginfo("-2 velocity: %f", self.get_waypoint_velocity(lane.waypoints[-2]))
-
 
                 # rospy.loginfo('length to end point: %f', self.wp_distance(lane.waypoints,0,5))
                 rospy.loginfo('road index:%d, %d',
@@ -135,7 +142,7 @@ class WaypointUpdater(object):
 
             self.final_waypoints_pub.publish(lane)
 
-    def get_index_diff(self,waypoints,wp_index_1,wp_index_2):
+    def get_index_diff(self, waypoints, wp_index_1, wp_index_2):
         """
         Calculate the index difference wp_index_2-wp_index1, with the consideration of modulus
 
@@ -145,10 +152,10 @@ class WaypointUpdater(object):
         :return:
         """
 
-        if (wp_index_2<wp_index_1):
-            return wp_index_2+len(waypoints)-wp_index_1
+        if (wp_index_2 < wp_index_1):
+            return wp_index_2 + len(waypoints) - wp_index_1
         else:
-            return wp_index_2-wp_index_1
+            return wp_index_2 - wp_index_1
 
     def reduce_to_zero(self, lane):
         """
@@ -182,7 +189,7 @@ class WaypointUpdater(object):
                     d = self.wp_distance(lane.waypoints, l, l + 1)
 
                     v_p = math.sqrt(v_0 * v_0 + 2 * a_max * d)
-                    #rospy.loginfo("calculated vp: %f", v_p)
+                    # rospy.loginfo("calculated vp: %f", v_p)
 
                     if current_linear_v > 8:
                         if v_p < v_max:
@@ -193,32 +200,35 @@ class WaypointUpdater(object):
                     else:
                         # this block deals with the sudden change of the traffic light
                         # set everything to zero
-                        self.set_waypoint_velocity(lane.waypoints,l,0)
+                        self.set_waypoint_velocity(lane.waypoints, l, 0)
 
     def get_closest_waypoint(self, pose, waypoints):
         closest_dist = float('inf')
         closest_wp = 0
-        for i in range(len(waypoints)):
-            dist = self.distance(pose.pose.position, waypoints[i].pose.pose.position)
+
+        for wp_index in range(len(waypoints)):
+            dist = self.distance(pose.pose.position, waypoints[wp_index].pose.pose.position)
             if dist < closest_dist:
                 closest_dist = dist
-                closest_wp = i
+                closest_wp = wp_index
 
         return closest_wp
 
     def get_next_waypoint(self, pose, waypoints):
         closest_wp = self.get_closest_waypoint(pose, waypoints)
-        wp_x = waypoints[closest_wp].pose.pose.position.x
-        wp_y = waypoints[closest_wp].pose.pose.position.y
-        heading = math.atan2((wp_y - pose.pose.position.y), (wp_x - pose.pose.position.x))
+
+        wp_x, wp_y, _ = get_position(waypoints[closest_wp])
+
+        heading_angle = math.atan2((wp_y - pose.pose.position.y), (wp_x - pose.pose.position.x))
         x = pose.pose.orientation.x
         y = pose.pose.orientation.y
         z = pose.pose.orientation.z
         w = pose.pose.orientation.w
         euler_angles_xyz = tf.transformations.euler_from_quaternion([x, y, z, w])
         theta = euler_angles_xyz[-1]
-        angle = math.fabs(theta - heading)
-        if angle > math.pi / 4.0:
+        waypoint_angle = math.fabs(theta - heading_angle)
+
+        if waypoint_angle > math.pi / 4.0:
             closest_wp += 1
 
         return closest_wp
@@ -228,9 +238,10 @@ class WaypointUpdater(object):
         for i in range(start_wp, end_wp):
             index = i % len(waypoints)
             wp = Waypoint()
-            wp.pose.pose.position.x = waypoints[index].pose.pose.position.x
-            wp.pose.pose.position.y = waypoints[index].pose.pose.position.y
-            wp.pose.pose.position.z = waypoints[index].pose.pose.position.z
+            wp_x, wp_y, wp_z = get_position(waypoints[index])
+            wp.pose.pose.position.x = wp_x
+            wp.pose.pose.position.y = wp_y
+            wp.pose.pose.position.z = wp_z
             wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
             if mode == 'const':
                 wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
