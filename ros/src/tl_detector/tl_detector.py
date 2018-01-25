@@ -18,8 +18,7 @@ STATE_COUNT_THRESHOLD = 3
 print("opencv version:", cv2.__version__)
 
 
-def record_image(cv_image, ref_state, save_path):
-    image_saving_frequency = 0.1
+def record_image(cv_image, ref_state, save_path,image_saving_frequency=0.1):
     random_val = random.random()
     if random_val < image_saving_frequency:
         random_str = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(8)])
@@ -230,7 +229,7 @@ class TLDetector(object):
             self.last_state = detected_state
             if detected_state != ref_state:
                 cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
-                record_image(cv_image, ref_state, save_path)
+                record_image(cv_image, ref_state, save_path,image_saving_frequency=1.0)
                 rospy.loginfo("det: %d, ref: %d", detected_state, ref_state)
         # return self.light_classifier.get_classification(cv_image)
         return self.last_state

@@ -199,7 +199,7 @@ def get_masked_hue_values_v2(rgb_image):
     """
 
     hsv_test_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
-    s_thres_val = channel_percentile(hsv_test_image[:, :, 1], percentile=70)
+    s_thres_val = channel_percentile(hsv_test_image[:, :, 1], percentile=30)
     v_thres_val = channel_percentile(hsv_test_image[:, :, 2], percentile=70)
     val_mask = high_value_region_mask(hsv_test_image, v_thres=v_thres_val)
     sat_mask = low_saturation_region_mask(hsv_test_image, s_thres=s_thres_val)
@@ -283,6 +283,9 @@ def classify_color_v2(rgb_image):
     """
 
     hue_1d_deg = get_masked_hue_values_v2(rgb_image)
+
+    if len(hue_1d_deg) == 0:
+        return 4,'unknown'
 
     hue_1d_rad = convert_to_hue_angle(hue_1d_deg)
 
