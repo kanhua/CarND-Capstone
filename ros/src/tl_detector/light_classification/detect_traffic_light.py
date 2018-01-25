@@ -19,8 +19,24 @@ DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
 model_path = "./"
 PATH_TO_CKPT = model_path + MODEL_NAME + '/frozen_inference_graph.pb'
 
+def download_model():
+    import six.moves.urllib as urllib
+    import tarfile
+
+    opener = urllib.request.URLopener()
+    opener.retrieve(DOWNLOAD_BASE + MODEL_FILE, MODEL_FILE)
+    tar_file = tarfile.open(MODEL_FILE)
+    for file in tar_file.getmembers():
+        file_name = os.path.basename(file.name)
+        if 'frozen_inference_graph.pb' in file_name:
+            tar_file.extract(file, os.getcwd())
+
 
 def load_graph():
+
+    if not os.path.exists(PATH_TO_CKPT):
+        download_model()
+
     detection_graph = tf.Graph()
     with detection_graph.as_default():
         od_graph_def = tf.GraphDef()

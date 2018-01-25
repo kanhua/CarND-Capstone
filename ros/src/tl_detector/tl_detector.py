@@ -15,6 +15,8 @@ import string
 import random
 
 STATE_COUNT_THRESHOLD = 3
+DETECT_FREQ=0.05  # The frequency of running image classification
+
 print("opencv version:", cv2.__version__)
 
 
@@ -224,7 +226,7 @@ class TLDetector(object):
 
         # Get classification
         # TODO change here use signal or classification
-        if random.random() < 0.05:
+        if random.random() < DETECT_FREQ:
             detected_state = self.light_classifier.get_classification(cv_image)
             self.last_state = detected_state
             if detected_state != ref_state:
